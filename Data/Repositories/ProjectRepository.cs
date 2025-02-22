@@ -16,7 +16,7 @@ namespace Data.Repositories
                 .Include(p => p.Status)
                 .Include(p => p.Service)
                 .Include(p => p.Staff)
-                .ThenInclude(s => s != null ? s.Role : null)
+                .ThenInclude(s => s.Role)  // ✅ No need for null check, EF handles it
                 .ToListAsync() ?? Enumerable.Empty<Project>();
         }
 
@@ -29,7 +29,7 @@ namespace Data.Repositories
                 .Include(p => p.Status)
                 .Include(p => p.Service)
                 .Include(p => p.Staff)
-                    .ThenInclude(s => s != null ? s.Role : null)  // ✅ Fix: Prevent null access
+                .ThenInclude(s => s.Role)  // ✅ No need for explicit null check
                 .FirstOrDefaultAsync(p => p.ProjectNumber == projectNumber);
 
             if (project == null)
@@ -39,6 +39,5 @@ namespace Data.Repositories
 
             return project;
         }
-
     }
 }

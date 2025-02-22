@@ -26,10 +26,8 @@ namespace Data.Repositories
 
         public virtual async Task<T?> GetAsync(object id)
         {
-            if (id == null || (id is int intId && intId <= 0))
-            {
+            if (id == null)
                 throw new ArgumentException("Invalid ID value.", nameof(id));
-            }
 
             Console.WriteLine($"DEBUG: Fetching {typeof(T).Name} with ID: {id}");
             var entity = await _dbSet.FindAsync(id);
@@ -39,13 +37,14 @@ namespace Data.Repositories
                 Console.WriteLine($"⚠️ WARNING: {typeof(T).Name} with ID {id} not found.");
             }
 
-            return entity; // ✅ Returns `null` instead of throwing
+            return entity;
         }
 
         public virtual async Task AddAsync(T entity)
         {
             Console.WriteLine($"DEBUG: Adding a new {typeof(T).Name} entity: {entity}");
             await _dbSet.AddAsync(entity);
+            await _context.SaveChangesAsync(); // ✅ Ensure data is saved
             Console.WriteLine($"✅ SUCCESS: {typeof(T).Name} entity added successfully.");
         }
 
@@ -57,7 +56,6 @@ namespace Data.Repositories
             Console.WriteLine($"✅ SUCCESS: {typeof(T).Name} entity updated successfully.");
         }
 
-
         public virtual async Task DeleteAsync(object id)
         {
             Console.WriteLine($"DEBUG: Deleting {typeof(T).Name} entity with ID: {id}");
@@ -65,6 +63,7 @@ namespace Data.Repositories
             if (entity != null)
             {
                 _dbSet.Remove(entity);
+                await _context.SaveChangesAsync(); // ✅ Ensure data is deleted
                 Console.WriteLine($"✅ SUCCESS: {typeof(T).Name} with ID {id} deleted successfully.");
             }
             else

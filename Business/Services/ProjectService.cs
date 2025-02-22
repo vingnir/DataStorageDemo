@@ -163,10 +163,10 @@ namespace Business.Services
             if (dto.TotalPrice < 0)
                 throw new ArgumentException("Total price cannot be negative.", nameof(dto.TotalPrice));
 
-            if (!dto.StartDate.HasValue || dto.StartDate == null)
+            if (!dto.StartDate.HasValue)
                 throw new ArgumentException("StartDate is required.", nameof(dto.StartDate));
 
-            if (!dto.EndDate.HasValue || dto.EndDate == null)
+            if (!dto.EndDate.HasValue)
                 throw new ArgumentException("EndDate is required.", nameof(dto.EndDate));
 
             Console.WriteLine($"🔵 [CreateProjectWithDetailsAsync] Creating project '{dto.ProjectNumber}'...");
@@ -176,6 +176,7 @@ namespace Business.Services
             {
                 await _unitOfWork.BeginTransactionAsync();
                 startedTransaction = true;
+                Console.WriteLine($"✅ [CreateProjectWithDetailsAsync] Transaction started for '{dto.ProjectNumber}'.");
             }
 
             try
@@ -203,19 +204,26 @@ namespace Business.Services
                     Description = dto.Description ?? "No description provided"
                 };
 
+                Console.WriteLine($"🟢 [CreateProjectWithDetailsAsync] Adding project '{dto.ProjectNumber}' to database...");
                 await _projectRepo.AddAsync(projectEntity);
-                if (startedTransaction) await _unitOfWork.CommitAsync();
 
-                Console.WriteLine($"✅ [CreateProjectWithDetailsAsync] Created project '{dto.ProjectNumber}' successfully.");
+                // 🔥 **Ensure Changes are Saved BEFORE Committing**
+                await _unitOfWork.CommitAsync();
+                Console.WriteLine($"✅ [CreateProjectWithDetailsAsync] Transaction committed successfully for '{dto.ProjectNumber}'.");
+
                 return dto.ProjectNumber;
             }
             catch (Exception ex)
             {
-                if (startedTransaction) await _unitOfWork.RollbackAsync();
-                Console.WriteLine($"❌ [CreateProjectWithDetailsAsync] Failed to create project '{dto.ProjectNumber}'. Error: {ex.Message}");
+                if (startedTransaction)
+                {
+                    await _unitOfWork.RollbackAsync();
+                    Console.WriteLine($"❌ [CreateProjectWithDetailsAsync] Transaction rolled back for '{dto.ProjectNumber}' due to error: {ex.Message}");
+                }
                 throw;
             }
         }
+
 
 
 
