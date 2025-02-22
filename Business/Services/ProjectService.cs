@@ -15,6 +15,7 @@ namespace Business.Services
     public class ProjectService(
         IProjectRepository projectRepo,
         IStaffService staffService,
+        IRoleService roleService,
         IServiceService serviceService,
         ICustomerService customerService,
         IUnitOfWork unitOfWork,  // ✅ Use UnitOfWork for Transactions
@@ -27,6 +28,7 @@ namespace Business.Services
         private readonly ICustomerService _customerService = customerService;
         private readonly IUnitOfWork _unitOfWork = unitOfWork;
         private readonly IDbContextFactory<AppDbContext> _dbContextFactory = dbContextFactory;
+        private readonly IRoleService _roleService = roleService;
 
         // ✅ Get All Projects
         public async Task<IEnumerable<ProjectDto>> GetAllProjectsAsync()
@@ -189,6 +191,7 @@ namespace Business.Services
 
                 int serviceId = await _serviceService.EnsureServiceAsync(dto.Service);
                 int staffId = await _staffService.EnsureStaffAsync(dto.Staff);
+                int roleId = await _roleService.EnsureRoleAsync(dto.Staff.RoleName ?? "Unknown Role");
 
                 var projectEntity = new Project
                 {
@@ -208,8 +211,11 @@ namespace Business.Services
                 await _projectRepo.AddAsync(projectEntity);
 
                 // 🔥 **Ensure Changes are Saved BEFORE Committing**
-                await _unitOfWork.CommitAsync();
-                Console.WriteLine($"✅ [CreateProjectWithDetailsAsync] Transaction committed successfully for '{dto.ProjectNumber}'.");
+                if (startedTransaction)
+                {
+                    await _unitOfWork.CommitAsync();
+                    Console.WriteLine($"✅ [CreateProjectWithDetailsAsync] Transaction committed successfully for '{dto.ProjectNumber}'.");
+                }
 
                 return dto.ProjectNumber;
             }

@@ -25,7 +25,9 @@ namespace Business.Services
         public async Task<int> EnsureRoleAsync(string roleName)
         {
             if (string.IsNullOrWhiteSpace(roleName))
-                throw new ArgumentException("Role name cannot be empty.", nameof(roleName));
+            {
+                throw new ArgumentException("❌ Role name cannot be empty or null.");
+            }
 
             Console.WriteLine($"🔍 [EnsureRoleAsync] Checking if role '{roleName}' exists...");
 
@@ -33,7 +35,7 @@ namespace Business.Services
             if (existingRole != null)
             {
                 Console.WriteLine($"✅ [EnsureRoleAsync] Role '{roleName}' exists (ID: {existingRole.Id}).");
-                return existingRole.Id;  // No transaction needed if found
+                return existingRole.Id;
             }
 
             Console.WriteLine($"❌ [EnsureRoleAsync] Role '{roleName}' not found, creating new one...");
@@ -42,30 +44,33 @@ namespace Business.Services
             if (!_unitOfWork.HasActiveTransaction)
             {
                 await _unitOfWork.BeginTransactionAsync();
-                Console.WriteLine("🔵 [EnsureRoleAsync] Started new transaction.");
                 startedTransaction = true;
             }
 
             try
             {
-                var newRole = new Role { Name = roleName };
+                var newRole = new Role { Name = roleName.Trim() }; // ✅ Ensure name is trimmed and not empty
                 await _roleRepo.AddAsync(newRole);
 
                 if (startedTransaction)
                 {
                     await _unitOfWork.CommitAsync();
-                    Console.WriteLine($"✅ [EnsureRoleAsync] Created Role '{roleName}' with ID {newRole.Id}.");
+                    Console.WriteLine($"✅ [EnsureRoleAsync] Created Role '{newRole.Name}' with ID {newRole.Id}.");
                 }
 
                 return newRole.Id;
             }
-            catch
+            catch (Exception ex)
             {
                 if (startedTransaction) await _unitOfWork.RollbackAsync();
-                Console.WriteLine($"❌ [EnsureRoleAsync] Failed to create role '{roleName}'.");
+                Console.WriteLine($"❌ [EnsureRoleAsync] Failed to create role '{roleName}'. Error: {ex.Message}");
                 throw;
             }
         }
+
+
+
+
 
         // ✅ Get Role by Name
         public async Task<int> GetRoleIdByNameAsync(string roleName)
@@ -85,6 +90,19 @@ namespace Business.Services
             Console.WriteLine($"✅ [GetRoleIdByNameAsync] Found role '{roleName}' with ID {role.Id}.");
             return role.Id;
         }
+
+        public async Task<RoleDto?> GetRoleByIdAsync(int roleId)
+        {
+            var role = await _roleRepo.GetRoleByIdAsync(roleId);
+            if (role == null) return null;
+
+            return new RoleDto
+            {
+                Id = role.Id,
+                Name = role.Name
+            };
+        }
+
 
         // ✅ Get All Roles (Using Factory for Read-Only Query)
         public async Task<IEnumerable<RoleDto>> GetAllRolesAsync()

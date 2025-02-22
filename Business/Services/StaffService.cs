@@ -27,55 +27,69 @@ namespace Business.Services.Implementations
         public async Task<int> EnsureStaffAsync(StaffDto staffDto)
         {
             if (staffDto == null)
-                throw new ArgumentException("Staff details cannot be null.");
+                throw new ArgumentException("❌ Staff details cannot be null.");
 
             Console.WriteLine($"DEBUG: Checking Role '{staffDto.RoleName}' for Staff '{staffDto.Name}'");
 
-            if (!_unitOfWork.HasActiveTransaction)  // ✅ Prevent duplicate transactions
+            // 🛠 **Ensure Role Exists First**
+            int roleId = await _roleService.EnsureRoleAsync(staffDto.RoleName);
+            if (roleId <= 0)
+            {
+                Console.WriteLine($"❌ ERROR: Role '{staffDto.RoleName}' does not exist and could not be created.");
+                throw new InvalidOperationException($"Role '{staffDto.RoleName}' does not exist.");
+            }
+            Console.WriteLine($"✅ DEBUG: Role '{staffDto.RoleName}' has ID {roleId}");
+
+            // 🛠 **Check if Staff Already Exists**
+            Console.WriteLine($"DEBUG: Checking if Staff '{staffDto.Name}' with RoleId {roleId} exists...");
+            var existingStaff = await _staffRepo.GetByNameAndRoleIdAsync(staffDto.Name, roleId);
+
+            if (existingStaff != null)
+            {
+                Console.WriteLine($"✅ DEBUG: Staff '{staffDto.Name}' already exists with RoleId {roleId}, returning existing StaffId: {existingStaff.StaffId}");
+                return existingStaff.StaffId;
+            }
+
+            // 🚀 **Create New Staff ONLY IF IT DOESN'T EXIST**
+            Console.WriteLine($"❌ DEBUG: Staff '{staffDto.Name}' does not exist, creating new entry...");
+
+            var newStaff = new Staff
+            {
+                Name = staffDto.Name,
+                RoleId = roleId,  // ✅ Ensure RoleId is set correctly
+            };
+
+            bool startedTransaction = false;
+            if (!_unitOfWork.HasActiveTransaction)
             {
                 await _unitOfWork.BeginTransactionAsync();
+                Console.WriteLine("🔵 [EnsureStaffAsync] Started new transaction.");
+                startedTransaction = true;
             }
 
             try
             {
-                // 🛠 Ensure Role Exists First
-                var roleId = await _roleService.EnsureRoleAsync(staffDto.RoleName);
-                if (roleId <= 0)
-                {
-                    throw new InvalidOperationException($"Role '{staffDto.RoleName}' does not exist and could not be created.");
-                }
-
-                // 🛠 Check if Staff Already Exists
-                Console.WriteLine($"DEBUG: Checking if Staff '{staffDto.Name}' with RoleId {roleId} exists...");
-                var existingStaff = await _staffRepo.GetByNameAndRoleIdAsync(staffDto.Name, roleId);
-
-                if (existingStaff != null)
-                {
-                    Console.WriteLine($"✅ DEBUG: Staff '{staffDto.Name}' already exists with RoleId {roleId}, returning existing StaffId: {existingStaff.StaffId}");
-                    await _unitOfWork.CommitAsync();
-                    return existingStaff.StaffId;
-                }
-
-                // 🚀 Create New Staff ONLY IF IT DOESN'T EXIST
-                Console.WriteLine($"❌ DEBUG: Staff '{staffDto.Name}' does not exist, creating new entry...");
-                var newStaff = new Staff
-                {
-                    Name = staffDto.Name,
-                    RoleId = roleId
-                };
-
                 await _staffRepo.AddAsync(newStaff);
-                await _unitOfWork.CommitAsync();
+                if (startedTransaction)
+                {
+                    await _unitOfWork.CommitAsync();
+                    Console.WriteLine($"✅ [EnsureStaffAsync] Created new Staff '{staffDto.Name}' with ID {newStaff.StaffId} and RoleId {newStaff.RoleId}");
+                }
 
-                Console.WriteLine($"✅ SUCCESS: Created new Staff '{staffDto.Name}' with ID {newStaff.StaffId}");
                 return newStaff.StaffId;
             }
-            catch
+            catch (Exception ex)
             {
-                await _unitOfWork.RollbackAsync();
+                if (startedTransaction)
+                {
+                    await _unitOfWork.RollbackAsync();
+                    Console.WriteLine($"❌ [EnsureStaffAsync] Transaction rolled back due to an error: {ex.Message}");
+                }
                 throw;
             }
         }
+
+
 
         // ✅ Check if Staff Exists
         public async Task<bool> CheckStaffExistsAsync(int staffId)

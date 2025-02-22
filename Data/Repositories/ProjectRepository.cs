@@ -11,14 +11,22 @@ namespace Data.Repositories
     {
         public override async Task<IEnumerable<Project>> GetAllAsync()
         {
-            return await _context.Projects
+            var projects = await _context.Projects
                 .Include(p => p.Customer)
                 .Include(p => p.Status)
                 .Include(p => p.Service)
                 .Include(p => p.Staff)
-                .ThenInclude(s => s.Role)  // ✅ No need for null check, EF handles it
-                .ToListAsync() ?? Enumerable.Empty<Project>();
+                .ThenInclude(s => s.Role) // ✅ Ensure role is included
+                .ToListAsync();
+
+            foreach (var project in projects)
+            {
+                Console.WriteLine($"🔍 DEBUG: Project '{project.ProjectNumber}', Staff '{project.Staff?.Name}', Role '{project.Staff?.Role?.Name}'");
+            }
+
+            return projects ?? Enumerable.Empty<Project>();
         }
+
 
         public override async Task<Project?> GetAsync(object id)
         {
